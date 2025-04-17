@@ -1,0 +1,124 @@
+diff --git a/setup_utils/find_libfuzzer.sh b/setup_utils/find_libfuzzer.sh
+index 1691b30..128c412 100755
+--- a/setup_utils/find_libfuzzer.sh
++++ b/setup_utils/find_libfuzzer.sh
+@@ -29,6 +29,8 @@ elif [[ "$uname" == "Linux" ]]; then
+     libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
+   elif [[ "$machine" == "i686" ]]; then
+     libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
++  elif [[ "$machine" == "aarch64" ]]; then
++    libpath="lib/linux/libclang_rt.fuzzer_no_main-aarch64.a"
+   else
+     >&2 echo "Failed to identify platform machine (got $machine); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
+   fi
+diff --git a/src/native/codetable_gen.cc b/src/native/codetable_gen.cc
+index 981de6a..c85b2aa 100644
+--- a/src/native/codetable_gen.cc
++++ b/src/native/codetable_gen.cc
+@@ -27,13 +27,27 @@
+ 
+ #include <iostream>
+ 
++#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 13
++/*
++ * python3.13 -c "import dis; print(dis.hasarg)"
++ * [149, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 236, 240, 241, 242, 243, 244, 245, 248, 249, 250, 251, 252, 253, 256, 257, 258, 259, 260, 261, 262, 264, 265, 266, 267]
++ * 149 RESUME
++ * 45 BINARY_OP ~ 118 YIELD_VALUE
++ * 256 JUMP ~ 267 STORE_FAST_MAYBE_NULL without 263 POP_BLOCK
++ */
++#define HAS_ARG(op) ((((op) >= 45) && ((op) <= 118)) \
++    || (((op) >= 256) && ((op) <= 267) && ((op) != 263)) \
++    || ((op) == 149)\
++    )
++#endif
++
+ #if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
+ 
+ namespace atheris {
+ 
+-uint8_t opcode_caches[256];
++uint8_t opcode_caches[268];
+ static bool dummy_initializer = []() {
+-  memset(opcode_caches, 0, 256);
++  memset(opcode_caches, 0, 268);
+   opcode_caches[BINARY_SUBSCR] = 4;
+   opcode_caches[STORE_SUBSCR] = 1;
+   opcode_caches[UNPACK_SEQUENCE] = 1;
+@@ -42,8 +56,10 @@ static bool dummy_initializer = []() {
+   opcode_caches[COMPARE_OP] = 2;
+   opcode_caches[LOAD_GLOBAL] = 5;
+   opcode_caches[BINARY_OP] = 1;
++#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION <= 11
+   opcode_caches[LOAD_METHOD] = 10;
+   opcode_caches[PRECALL] = 1;
++#endif
+   opcode_caches[CALL] = 4;
+   return true;
+ }();
+diff --git a/src/native/counters.cc b/src/native/counters.cc
+index 234fec6..2f93b27 100644
+--- a/src/native/counters.cc
++++ b/src/native/counters.cc
+@@ -18,6 +18,7 @@
+ 
+ #include <sys/mman.h>
+ 
++#include <cstdint>
+ #include <iostream>
+ 
+ #include "macros.h"
+diff --git a/src/version_dependent.py b/src/version_dependent.py
+index 21c66c4..dc9ccf3 100644
+--- a/src/version_dependent.py
++++ b/src/version_dependent.py
+@@ -37,10 +37,10 @@ from typing import List
+ 
+ PYTHON_VERSION = sys.version_info[:2]
+ 
+-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 11):
++if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 13):
+   raise RuntimeError(
+       "You are fuzzing on an unsupported python version: "
+-      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.11 are "
++      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.13 are "
+       + "supported by atheris 2.0. Use atheris 1.0 for older python versions."
+   )
+ 
+@@ -139,7 +139,7 @@ if PYTHON_VERSION <= (3, 10):
+       "JUMP_IF_TRUE_OR_POP",
+       "JUMP_IF_FALSE_OR_POP",
+   ])
+-else:
++elif PYTHON_VERSION < (3, 12):
+   HAVE_REL_REFERENCE.extend([
+       "JUMP_IF_TRUE_OR_POP",
+       "JUMP_IF_FALSE_OR_POP",
+@@ -328,7 +328,7 @@ elif (3, 10) <= PYTHON_VERSION <= (3, 10):
+     return bytes(lnotab)
+ 
+ 
+-elif (3, 11) <= PYTHON_VERSION <= (3, 11):
++elif (3, 11) <= PYTHON_VERSION:
+   from .native import _generate_codetable  # pytype: disable=import-error
+   def get_lnotab(code, listing):
+     ret = _generate_codetable(code, listing)
+@@ -391,7 +391,7 @@ def parse_exceptiontable(code):
+   return ExceptionTable([])
+ 
+ 
+-if (3, 11) <= PYTHON_VERSION <= (3, 11):
++if (3, 11) <= PYTHON_VERSION:
+   from .native import _generate_exceptiontable  # pytype: disable=import-error
+ 
+   def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
+@@ -520,7 +520,8 @@ if PYTHON_VERSION >= (3, 11):
+   # 3.11 requires a PRECALL instruction prior to every CALL instruction.
+   def call(argc: int):
+     ret = []
+-    ret.append((dis.opmap["PRECALL"], argc))
++    if PYTHON_VERSION <= (3, 11):
++        ret.append((dis.opmap["PRECALL"], argc))
+     ret.append((dis.opmap["CALL"], argc))
+     return ret
+ 
