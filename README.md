@@ -1,6 +1,12 @@
 # pyjitfuzz
 CPython JIT Compiler Fuzzing - Capstone Project
 
+## Issues
+| something problems.. :thinking:
+
+- cpython 
+    - state function occurs segmentation fault (wtf :sad:)
+
 ## To-do
 | implementation :thinking:
 
