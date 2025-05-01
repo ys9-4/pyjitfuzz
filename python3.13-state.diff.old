@@ -1,0 +1,103 @@
+diff --git a/Python/bltinmodule.c b/Python/bltinmodule.c
+index 06bf4d38f9e..88e6671fec4 100644
+--- a/Python/bltinmodule.c
++++ b/Python/bltinmodule.c
+@@ -21,6 +21,89 @@
+ #endif
+ 
+ 
++/* built-in function for cpython JIT fuzzing */
++static PyObject*
++builtin_state(PyObject *bases, PyObject *args)
++{
++    PyThreadState *tstate = _PyThreadState_GET();
++    _PyInterpreterFrame *frame = tstate->current_frame;
++
++    PyObject *globals = frame->f_globals;
++
++    printf("<global>: [");
++    fflush(stdout);        
++    if (globals != NULL && PyDict_Check(globals))
++    {
++        PyObject *key, *value;
++        Py_ssize_t position = 0;
++
++        while (PyDict_Next(globals, &position, &key, &value))
++        {   
++            if (key != NULL && PyUnicode_Check(key))
++            {
++                const char *key_str = PyUnicode_AsUTF8(key);
++                
++                PyObject *repr = PyObject_Repr(value);
++                const char *value_str = PyUnicode_AsUTF8(repr);
++                
++                printf("%s = %s, ", key_str, value_str);
++            }
++        }
++    }
++    fflush(stdout);
++    printf("]\n");
++
++    for (; frame != NULL; frame = frame->previous)
++    {
++        if (!PyCode_Check(frame->f_executable)) continue;
++
++        /* print local variables */
++        PyObject **stack_base = _PyFrame_Stackbase(frame);
++        PyObject **stack_top = frame->localsplus;
++        
++        PyObject *func_obj = PyObject_Repr(frame->f_funcobj);
++
++        PyObject_Print(func_obj, stdout, 1);
++        printf("\n<stack>: [");
++        fflush(stdout);
++        for (PyObject **ptr = stack_base; ptr >= stack_top; ptr--)
++        {   
++            if (ptr != stack_base)
++            {
++                printf(", ");
++            }
++
++            if (*ptr == NULL) {
++                printf("<nil>");
++                continue;
++            }
++
++            if (*ptr == Py_None
++                || PyBool_Check(*ptr)
++                || PyLong_CheckExact(*ptr)
++                || PyFloat_CheckExact(*ptr)
++                || PyUnicode_CheckExact(*ptr)) 
++            {
++                PyObject_Print(*ptr, stdout, 1);
++            }
++            else
++            {
++                PyObject *repr = PyObject_Repr(*ptr);
++                PyObject_Print(repr, stdout, 1);
++            }
++        }
++        fflush(stdout);
++        printf("]\n");
++    }
++
++    Py_RETURN_NONE;
++}
++
++PyDoc_STRVAR(state_doc,
++    "state()\n\
++    \n\
++    Print the current execution state including stack frames and local variables.");
++
+ static PyObject*
+ update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)
+ {
+@@ -3128,6 +3211,8 @@ static PyMethodDef builtin_methods[] = {
+     BUILTIN_SORTED_METHODDEF
+     BUILTIN_SUM_METHODDEF
+     {"vars",            builtin_vars,       METH_VARARGS, vars_doc},
++    /* add to cpython JIT fuzzing */
++    {"state", builtin_state, METH_NOARGS , state_doc},
+     {NULL,              NULL},
+ };
+ 
