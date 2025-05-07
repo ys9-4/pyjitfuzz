@@ -15,6 +15,45 @@ Seed 파일들 보면 내 의도가 좀 보일거야 <br>
 1. 동일하게 긴 문자열 넣어보자...
 
 ---
+
+probe_state는 타입 검증하는 좋은 함수니까 남겨두고 <br>
+메모리 배치 같은 거 확인 할 수 있는 함수가 필요하다 <br>
+    -> 이게 곧 JIT 컴파일링으로 발생한 다른 점을 알 수 있는거니까.... <br><br>
+
+아마 그럼 frame을 찾아봐야하지 않을까? <br>
+
+🔍 JIT 퍼징에서 살펴볼 주요 요소
+
+항목	설명	이유
+1. Frame 내부 필드 변화	stacktop, instr_ptr, f_executable, localsplus[]	JIT 최적화 중 레지스터/스택 배치가 달라져 예상치 못한 실행 흐름 발생 가능
+2. PyCodeObject 필드	co_flags, co_varnames, co_code, co_consts, co_qualname 등	JIT 시점에 바이트코드 분석·변형이 이뤄지므로 구조가 바뀌는지 감시
+3. PyTypeObject의 vectorcall 관련 필드	tp_vectorcall, tp_vectorcall_offset	JIT이 최적화된 호출 경로를 사용하도록 바꾸는 부분, 해시 추적 가능
+4. JIT IR(Intermediate Representation) 캐시나 메모리 구조	JIT 내부 캐시 정보, 예: 코드가 몇 번 실행되어 JIT됐는지	히트 카운터, 트리거 조건이 제대로 작동하는지
+5. locals()나 globals() 동작	특정 최적화에 의해 생략되거나 lazy 처리됨	JIT 적용 시점 이후 이 값이 누락되거나 예상과 다를 수 있음
+6. trace function과 디버깅 훅	디버거, 트레이서가 예상대로 호출되지 않을 수 있음	JIT된 경로는 일반 프레임과 다르게 동작 가능
+
+
+
+⸻
+
+🧪 퍼징으로 포착하고 싶은 이상 현상
+	•	🔥 JIT 전과 후의 probe_state() 결과가 다름
+	•	🌀 같은 입력인데 결과가 다르게 나옴
+	•	❌ Illegal instruction / segfault / memory corruption
+	•	🧊 데이터 변형 없이 최적화된 결과가 틀림 (semantic bug)
+
+⸻
+
+✅ 추천 관찰 포인트
+	•	f_executable → JIT 최적화 시 다른 코드 오브젝트로 대체되었는가?
+	•	PyCodeObject.co_code → JIT 컴파일 전후 바이트코드 변화?
+	•	type(obj).__name__ → JIT 이후 객체의 동적 속성 변경 여부
+	•	localsplus[] → 스택에 저장되는 값이 다르게 보이는지?
+
+GPT의 의견...
+
+---
+
 <br>
 
 > _typeobject 코드
@@ -111,4 +150,55 @@ typedef struct _typeobject {
 
     unsigned char tp_watched;      // ✅ 타입 감시 기능을 사용하는 감시자 비트마스크
 } PyTypeObject;
+```
+
+<br> <br>
+
+```c
+typedef struct _PyInterpreterFrame {
+    PyObject *f_executable;         // 이 frame이 실행 중인 코드 객체(code object) 또는 None
+                                    // → 함수나 모듈 블록의 코드 정보를 포함 (실행 대상)
+                                    // → strong reference (명시적으로 참조 증가)
+
+    struct _PyInterpreterFrame *previous; 
+                                    // 직전 프레임을 가리키는 포인터 (이전 호출 스택 프레임)
+                                    // → 스택 프레임 체인 구성
+
+    PyObject *f_funcobj;            // 현재 실행 중인 함수 객체
+                                    // → C 스택 위가 아닌 경우에만 유효 (Python 함수)
+
+    PyObject *f_globals;            // 글로벌 변수 딕셔너리 (__globals__)
+                                    // → C 스택 위가 아닌 경우에만 유효 (borrowed reference)
+
+    PyObject *f_builtins;           // __builtins__ 참조
+                                    // → C 스택 위가 아닌 경우에만 유효 (borrowed reference)
+
+    PyObject *f_locals;             // 로컬 변수 딕셔너리 (__locals__)
+                                    // → 가비지 컬렉션을 위해 strong reference 유지 (nullable)
+                                    // → C 스택 위가 아닌 경우에만 유효
+
+    PyFrameObject *frame_obj;       // PyFrameObject로 감싼 프레임 (디버깅 등에서 사용)
+                                    // → NULL일 수 있음 (lazy 생성)
+
+    _Py_CODEUNIT *instr_ptr;        // 현재 실행 중인 바이트코드 명령어의 위치 (IP)
+                                    // → CPython 인터프리터가 실제로 가리키는 바이트코드 주소
+                                    // → 오프셋 계산 가능 (코드 객체의 co_code 기준)
+
+    int stacktop;                   // TOS (Top Of Stack)의 위치 (localsplus로부터의 오프셋)
+                                    // → 현재 스택의 깊이를 의미함
+                                    // → localsplus 배열의 어디까지 스택으로 쓰고 있는지를 나타냄
+
+    uint16_t return_offset;         // 호출에서 되돌아갈 바이트코드 오프셋 (CALL 시 유효)
+                                    // → JUMPBACK을 위한 값
+
+    char owner;                     // 이 프레임의 소유자 (예: 실행 중인 스레드)
+                                    // → 내부 관리용 (enum으로 구분됨)
+
+    // 이 아래는 스택 및 로컬 변수를 포함한 "실제 실행 데이터"입니다
+    PyObject *localsplus[1];        // 로컬 변수 + 평가 스택 (일체형 배열)
+                                    // → localsplus[0 ~ varcount-1]는 로컬 변수
+                                    // → localsplus[varcount ~ stacktop]는 평가 스택
+                                    // → 구조체 끝에 가변 길이 배열로 할당됨 (stack grows upward)
+
+} _PyInterpreterFrame;
 ```
