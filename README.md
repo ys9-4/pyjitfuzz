@@ -2,6 +2,7 @@
 CPython JIT Compiler Fuzzing - Capstone Project
 
 ## Note
+### python3.13-state.diff.old
 execute `.py` file
 ```
 parallels@ubuntu-linux-2404:~/workspace/cpython$ python3-jit ../pyjitfuzz/test.py 
@@ -40,7 +41,7 @@ execute on interpreter
 | something problems.. :thinking:
 
 - cpython 
-    - state function occurs segmentation fault (wtf :sad:)
+    - list, tuple, set, dict, unicode type are not implementated in probe_state function
 
 ## To-do
 | implementation :thinking:
@@ -51,5 +52,8 @@ execute on interpreter
     - ex) PUSH ARG1, PUSH ARG2, PUSH FUNC, CALL 2 = FUNC(ARG1, ARG2)
 
 - cpython
-    - add state builtin function
-    - hash(PyStackFrame + Variables)
+    - old version
+        - add state builtin function
+        - hash(PyStackFrame + Variables)
+    - new version
+        - print hash(Py[*]Object informations (PyLongObject, PyFloatObject, etc))
