@@ -1,192 +1,333 @@
 diff --git a/Python/bltinmodule.c b/Python/bltinmodule.c
-index 06bf4d38f9e..cbde2f611d9 100644
+index 06bf4d38f9e..f7e9ad7e872 100644
 --- a/Python/bltinmodule.c
 +++ b/Python/bltinmodule.c
-@@ -21,6 +21,228 @@
+@@ -20,6 +20,368 @@
+ #  include <unistd.h>             // isatty()
  #endif
  
- 
-+/* built-in function for cpython JIT fuzzing */
-+static PyObject*
-+builtin_probe_state(PyObject *module, PyObject *arg)
++static void
++type_object_state(PyTypeObject *tp, PyObject *result)
 +{
-+    PyTypeObject* type = arg->ob_type;
-+
-+    PyObject* state_str = PyUnicode_FromString("");
-+    PyObject* temp_str = NULL;
-+    PyObject* result = NULL;
++    PyObject* tmp = NULL;
 +       
 +    /* 1. mm field */
-+    temp_str = PyUnicode_FromFormat("name:%s;", type->tp_name);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_name:%s;", tp->tp_name);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("basicsize:%zd;", type->tp_basicsize);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_basicsize:%zd;", tp->tp_basicsize);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("itemsize:%zd;", type->tp_itemsize);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_itemsize:%zd;", tp->tp_itemsize);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("alloc:%p;", type->tp_alloc);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_alloc:%p;", tp->tp_alloc);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("new:%p;", type->tp_new);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_new:%p;", tp->tp_new);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("free:%p;", type->tp_free);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_free:%p;", tp->tp_free);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* ref count field */
-+    temp_str = PyUnicode_FromFormat("dealloc:%p;", type->tp_dealloc);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_dealloc:%p;", tp->tp_dealloc);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("clear:%p;", type->tp_clear);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_clear:%p;", tp->tp_clear);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("del:%p;", type->tp_del);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_del:%p;", tp->tp_del);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("finalize:%p;", type->tp_finalize);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_finalize:%p;", tp->tp_finalize);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* cache/opt field */
-+    temp_str = PyUnicode_FromFormat("version_tag:%u;", type->tp_version_tag);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_version_tag:%u;", tp->tp_version_tag);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("vectorcall:%p;", type->tp_vectorcall);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_vectorcall:%p;", tp->tp_vectorcall);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("vectorcall_offset:%zd;", type->tp_vectorcall_offset);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_vectorcall_offset:%zd;", tp->tp_vectorcall_offset);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* gc field */
-+    temp_str = PyUnicode_FromFormat("traverse:%p;", type->tp_traverse);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_traverse:%p;", tp->tp_traverse);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("is_gc:%p;", type->tp_is_gc);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_is_gc:%p;", tp->tp_is_gc);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* fp field */
-+    temp_str = PyUnicode_FromFormat("as_number:%p;", type->tp_as_number);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_as_number:%p;", tp->tp_as_number);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("as_sequence:%p;", type->tp_as_sequence);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_as_sequence:%p;", tp->tp_as_sequence);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("as_mapping:%p;", type->tp_as_mapping);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_as_mapping:%p;", tp->tp_as_mapping);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("as_buffer:%p;", type->tp_as_buffer);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_as_buffer:%p;", tp->tp_as_buffer);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("as_async:%p;", type->tp_as_async);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_as_async:%p;", tp->tp_as_async);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* dynamic field */
-+    if (type->tp_dict) {
-+        temp_str = PyUnicode_FromFormat("tp_dict_id:%p;", type->tp_dict);
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++    if (tp->tp_dict) {
++        tmp = PyUnicode_FromFormat("tp_dict:%p;", tp->tp_dict);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +        
-+        temp_str = PyUnicode_FromFormat("tp_dict_refcount:%ld;", Py_REFCNT(type->tp_dict));
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++        tmp = PyUnicode_FromFormat("tp_dict_ob_refcount:%ld;", Py_REFCNT(tp->tp_dict));
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    } else {
-+        temp_str = PyUnicode_FromString("tp_dict:None;");
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++        tmp = PyUnicode_FromString("tp_dict:None;");
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    }
 +    
-+    if (type->tp_base) {
-+        temp_str = PyUnicode_FromFormat("tp_base_name:%s;", type->tp_base->tp_name);
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++    if (tp->tp_base) {
++        tmp = PyUnicode_FromFormat("tp_base->tp_name:%s;", tp->tp_base->tp_name);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    } else {
-+        temp_str = PyUnicode_FromString("tp_base:None;");
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++        tmp = PyUnicode_FromString("tp_base:None;");
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    }
 +    
-+    if (type->tp_bases) {
-+        temp_str = PyUnicode_FromFormat("tp_bases_id:%p;", type->tp_bases);
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++    if (tp->tp_bases) {
++        tmp = PyUnicode_FromFormat("tp_bases:%p;", tp->tp_bases);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    } else {
-+        temp_str = PyUnicode_FromString("tp_bases:None;");
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++        tmp = PyUnicode_FromString("tp_bases:None;");
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    }
 +    
-+    if (type->tp_mro) {
-+        temp_str = PyUnicode_FromFormat("tp_mro_id:%p;", type->tp_mro);
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++    if (tp->tp_mro) {
++        tmp = PyUnicode_FromFormat("tp_mro_id:%p;", tp->tp_mro);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    } else {
-+        temp_str = PyUnicode_FromString("tp_mro:None;");
-+        PyUnicode_Append(&state_str, temp_str);
-+        Py_DECREF(temp_str);
++        tmp = PyUnicode_FromString("tp_mro:None;");
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
 +    }
 +    
 +    /* offset field */
-+    temp_str = PyUnicode_FromFormat("dictoffset:%zd;", type->tp_dictoffset);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_dictoffset:%zd;", tp->tp_dictoffset);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("weaklistoffset:%zd;", type->tp_weaklistoffset);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_weaklistoffset:%zd;", tp->tp_weaklistoffset);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* ? field */
-+    temp_str = PyUnicode_FromFormat("watched:%u;", type->tp_watched);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_watched:%u;", tp->tp_watched);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
-+    temp_str = PyUnicode_FromFormat("versions_used:%u;", type->tp_versions_used);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_versions_used:%u;", tp->tp_versions_used);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
 +    
 +    /* flags */
-+    temp_str = PyUnicode_FromFormat("flags:%lu;", type->tp_flags);
-+    PyUnicode_Append(&state_str, temp_str);
-+    Py_DECREF(temp_str);
++    tmp = PyUnicode_FromFormat("tp_flags:%lu;", tp->tp_flags);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
++}
++
++static void
++object_state(PyObject *obj, PyObject *result)
++{
++    PyObject* tmp;
++
++    tmp = PyUnicode_FromFormat("ob_refcnt:%zd;", obj->ob_refcnt);
++    PyUnicode_Append(&result, tmp);
++    Py_DECREF(tmp);
++
++    type_object_state(obj->ob_type, result);
++
++    if (PyLong_Check(obj))
++    {
++        PyLongObject *long_obj = (PyLongObject *)obj;
++
++        tmp = PyUnicode_FromFormat("long_value.lv_tag:%zd;", long_obj->long_value.lv_tag);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++
++        Py_ssize_t size = long_obj->long_value.lv_tag >> NON_SIZE_BITS;
++
++        for (int i = 0; i < size; i++)
++        {
++            tmp = PyUnicode_FromFormat("long_value.ob_digit[%d]:%zd;", i, long_obj->long_value.ob_digit[i]);
++            PyUnicode_Append(&result, tmp);
++            Py_DECREF(tmp);
++        }
++    }
++    else if (PyBool_Check(obj))
++    {
++        if (Py_IsTrue(obj))
++        {
++            tmp = PyUnicode_FromFormat("True;");
++            PyUnicode_Append(&result, tmp);
++            Py_DECREF(tmp);
++        }
++        else
++        {
++            tmp = PyUnicode_FromFormat("False;");
++            PyUnicode_Append(&result, tmp);
++            Py_DECREF(tmp);
++        }
++    }
++    else if (PyFloat_Check(obj))
++    {
++        PyFloatObject *float_obj = (PyFloatObject *)obj;
++
++        tmp = PyUnicode_FromFormat("ob_fval:%.4lf;", float_obj->ob_fval);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++    }
++    else if (PyComplex_Check(obj))
++    {
++        PyComplexObject *complex_obj = (PyComplexObject *)obj;
++
++        tmp = PyUnicode_FromFormat("cval.real:%.4lf;", complex_obj->cval.real);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++
++        tmp = PyUnicode_FromFormat("cval.imag:%.4lf;", complex_obj->cval.imag);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++    }
++    else if (PyBytes_Check(obj))
++    {
++        PyBytesObject *bytes_obj = (PyBytesObject *)obj;
++
++        tmp = PyUnicode_FromFormat("ob_sval: %s;", bytes_obj->ob_sval);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++    }
++    else if (PyByteArray_Check(obj))
++    {
++        PyByteArrayObject *bytearray_obj = (PyByteArrayObject *)obj;
++        
++        tmp = PyUnicode_FromFormat("ob_alloc: %zd;", bytearray_obj->ob_alloc);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++
++        tmp = PyUnicode_FromFormat("ob_bytes: %s;", bytearray_obj->ob_bytes);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++
++        tmp = PyUnicode_FromFormat("ob_start: %s;", bytearray_obj->ob_start);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++
++        tmp = PyUnicode_FromFormat("ob_exports: %zd;", bytearray_obj->ob_exports);
++        PyUnicode_Append(&result, tmp);
++        Py_DECREF(tmp);
++    }
++    else if (PyUnicode_Check(obj))
++    {
++        PyUnicodeObject *unicode_obj = (PyUnicodeObject *)obj;
++    }
++    else if (PyTuple_Check(obj))
++    {
++        PyTupleObject *tuple_obj = (PyTupleObject *)obj;
++    }
++    else if (PyList_Check(obj))
++    {
++        PyListObject *list_obj = (PyListObject *)obj;
++    }
++    else if (PyDict_Check(obj))
++    {
++        PyDictObject *dict_obj = (PyDictObject *)obj;
++    }
++    else if (PySet_Check(obj))
++    {
++        PySetObject *set_obj = (PySetObject *)obj;
++    }
++    // else if (PyFunction_Check(obj))
++    // {
++    //     PyFunctionObject *function_obj = (PyFunctionObject *)obj;
++    // }
++    // else if (PyInstanceMethod_Check(obj))
++    // {
++    //     PyInstanceMethodObject *instance_method_obj = (PyInstanceMethodObject *)obj;
++    // }
++    // else if (PyMethod_Check(obj))
++    // {
++    //     PyMethodObject *method_obj = (PyMethodObject *)obj;
++    // }
++    // else if (PyCell_Check(obj))
++    // {
++    //     PyCellObject *cell_obj = (PyCellObject *)obj;
++    // }
++    // else if (PyCode_Check(obj))
++    // {
++    //     PyCodeObject *code_obj = (PyCodeObject *)obj;
++    // }
++    else
++    {
++        /* etc */
++    }
++}
++
++/* built-in function for cpython JIT fuzzing */
++static PyObject*
++builtin_probe_state(PyObject *module, PyObject *obj)
++{
++    PyObject *result = NULL;
++
++    PyObject *state = PyUnicode_FromFormat("");
++    object_state(obj, state);
 +    
-+    /* encoding utf-8 */
-+    PyObject* bytes_obj = PyUnicode_AsUTF8String(state_str);
++    PyObject* bytes_obj = PyUnicode_AsUTF8String(state);
 +    if (!bytes_obj) {
-+        Py_DECREF(state_str);
++        Py_DECREF(state);
 +        return NULL;
 +    }
 +    
 +    /* hash to sha256 */
 +    PyObject* hashlib_module = PyImport_ImportModule("hashlib");
 +    if (!hashlib_module) {
-+        Py_DECREF(state_str);
++        Py_DECREF(state);
 +        Py_DECREF(bytes_obj);
 +        return NULL;
 +    }
 +    
 +    PyObject* sha256_func = PyObject_GetAttrString(hashlib_module, "sha256");
 +    if (!sha256_func) {
-+        Py_DECREF(state_str);
++        Py_DECREF(state);
 +        Py_DECREF(bytes_obj);
 +        Py_DECREF(hashlib_module);
 +        return NULL;
@@ -194,7 +335,7 @@ index 06bf4d38f9e..cbde2f611d9 100644
 +    
 +    PyObject* hash_obj = PyObject_CallFunctionObjArgs(sha256_func, bytes_obj, NULL);
 +    if (!hash_obj) {
-+        Py_DECREF(state_str);
++        Py_DECREF(state);
 +        Py_DECREF(bytes_obj);
 +        Py_DECREF(hashlib_module);
 +        Py_DECREF(sha256_func);
@@ -203,12 +344,12 @@ index 06bf4d38f9e..cbde2f611d9 100644
 +    
 +    result = PyObject_CallMethod(hash_obj, "hexdigest", NULL);
 +    
-+    Py_DECREF(state_str);
++    Py_DECREF(state);
 +    Py_DECREF(bytes_obj);
 +    Py_DECREF(hashlib_module);
 +    Py_DECREF(sha256_func);
 +    Py_DECREF(hash_obj);
-+    
++
 +    return result;
 +}
 +
@@ -227,11 +368,10 @@ index 06bf4d38f9e..cbde2f611d9 100644
 +    "save_state()\n\
 +    \n\
 +    save state");
-+
+ 
  static PyObject*
  update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)
- {
-@@ -3128,6 +3350,9 @@ static PyMethodDef builtin_methods[] = {
+@@ -3128,6 +3490,9 @@ static PyMethodDef builtin_methods[] = {
      BUILTIN_SORTED_METHODDEF
      BUILTIN_SUM_METHODDEF
      {"vars",            builtin_vars,       METH_VARARGS, vars_doc},
