@@ -1,0 +1,75 @@
+diff --git a/Python/bltinmodule.c b/Python/bltinmodule.c
+index 06bf4d38f9e..cbde2f611d9 100644
+--- a/Python/bltinmodule.c
++++ b/Python/bltinmodule.c
+@@ -21,6 +21,50 @@
+ #endif
+ 
+ 
++/* built-in function for cpython JIT fuzzing */
++static PyObject*
++builtin_seon_state(PyObject *module, PyObject *arg)
++{
++    PyTypeObject* type = arg->ob_type;
++
++    PyObject* state_str = PyUnicode_FromString("");
++    PyObject* temp_str = NULL;
++    PyObject* result = NULL;
++
++    // Only include fields likely to change during fuzzing or mutation
++    if (type->tp_dict) {
++        temp_str = PyUnicode_FromFormat("tp_dict_id:%p;", type->tp_dict);
++        PyUnicode_Append(&state_str, temp_str);
++        Py_DECREF(temp_str);
++
++        temp_str = PyUnicode_FromFormat("tp_dict_refcount:%ld;", Py_REFCNT(type->tp_dict));
++        PyUnicode_Append(&state_str, temp_str);
++        Py_DECREF(temp_str);
++    } else {
++        temp_str = PyUnicode_FromString("tp_dict:None;");
++        PyUnicode_Append(&state_str, temp_str);
++        Py_DECREF(temp_str);
++    }
++
++    if (type->tp_mro) {
++        temp_str = PyUnicode_FromFormat("tp_mro_id:%p;", type->tp_mro);
++        PyUnicode_Append(&state_str, temp_str);
++        Py_DECREF(temp_str);
++    } else {
++        temp_str = PyUnicode_FromString("tp_mro:None;");
++        PyUnicode_Append(&state_str, temp_str);
++        Py_DECREF(temp_str);
++    }
++
++    temp_str = PyUnicode_FromFormat("tp_flags:%lu;", type->tp_flags);
++    PyUnicode_Append(&state_str, temp_str);
++    Py_DECREF(temp_str);
++
++    printf("[seon_state] Raw:");
++    PyObject_Print(state_str, stdout, 0);
++    printf("\n");
++
++    PyObject* bytes_obj = PyUnicode_AsUTF8String(state_str);
++    PyObject* hashlib = PyImport_ImportModule("hashlib");
++    PyObject* sha256_func = PyObject_GetAttrString(hashlib, "sha256");
++    PyObject* hash_obj = PyObject_CallFunctionObjArgs(sha256_func, bytes_obj, NULL);
++    result = PyObject_CallMethod(hash_obj, "hexdigest", NULL);
++    Py_DECREF(state_str); Py_DECREF(bytes_obj); Py_DECREF(hashlib); Py_DECREF(sha256_func); Py_DECREF(hash_obj);
++    return result;
++}
++
++PyDoc_STRVAR(seon_state_doc,
++    "seon_state()
++
++    Return hash of mutable PyTypeObject fields.");
++
+ static PyObject*
+ update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)
+ {
+@@ -3128,6 +3172,8 @@ static PyMethodDef builtin_methods[] = {
+     BUILTIN_SORTED_METHODDEF
+     BUILTIN_SUM_METHODDEF
+     {"vars",            builtin_vars,       METH_VARARGS, vars_doc},
++    {"seon_state", builtin_seon_state, METH_O, seon_state_doc},
+     {NULL,              NULL},
+ };

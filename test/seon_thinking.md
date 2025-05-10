@@ -73,6 +73,8 @@ GPT의 의견...
 
 > _typeobject 코드
 
+_Doc/includes/typestruct.h:1_
+
 ```c
 typedef struct _typeobject {
     PyObject_VAR_HEAD  // Python 객체 헤더 (ref count, 타입 정보 등 포함)

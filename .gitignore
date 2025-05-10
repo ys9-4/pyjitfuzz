@@ -1,0 +1,15 @@
+.DS_Store
+Thumbs.db
+
+__pycache__/
+
+.vscode/
+.idea/
+
+build/
+dist/
+
+*.o
+*.so
+
+seon_thi*
