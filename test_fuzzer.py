@@ -26,6 +26,29 @@ def run_python(code: str, jit_enabled: bool) -> str:
     except Exception as e:
         return f"ERROR: {str(e)}"
 
+def get_next_sample_filename(base_dir: str, prefix: str = "check_code", extension: str = "") -> str:
+    os.makedirs(base_dir, exist_ok=True)
+    existing = [
+        fname for fname in os.listdir(base_dir)
+        if fname.startswith(prefix)
+    ]
+    existing_nums = [
+        int(fname[len(prefix):])
+        for fname in existing if fname[len(prefix):-len(extension)].isdigit()
+    ]
+    next_num = max(existing_nums + [0]) + 1
+    return os.path.join(base_dir, f"{prefix}{next_num:04d}")
+
+def save_case(code: str, output_jit: str, output_interp: str):
+    filename = get_next_sample_filename("./check_sample")
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("차이 발생! 입력 코드:\n")
+        f.write(code + "\n\n")
+        f.write("--- JIT ---\n")
+        f.write(output_jit + "\n\n")
+        f.write("--- INTERP ---\n")
+        f.write(output_interp + "\n")
+
 def TestOneInput(data: bytes):
     """
     fuzz function - generate, mutate, run, and compare JIT vs interpreter
@@ -38,16 +61,20 @@ def TestOneInput(data: bytes):
         output_jit = run_python(code, jit_enabled=True)
         output_interp = run_python(code, jit_enabled=False)
 
-        print(output_jit)
+        if "Error" in output_jit or "Warning" in output_jit:
+            print("\n에러 발생")
+            print(code)
+            print(output_jit)
 
-        if output_jit != output_interp:
+        if "값 변화 발생:" in output_jit or output_jit != output_interp:
             print("\n차이 발생! 입력 코드:")
             print(code)
             print("--- JIT ---")
             print(output_jit)
             print("--- INTERP ---")
             print(output_interp)
-            raise RuntimeError("JIT/INTERP mismatch")
+            save_case(code, output_jit, output_interp)
+
     except Exception:
         pass
 

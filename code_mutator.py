@@ -1,5 +1,5 @@
 import random
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
 def generate_templates() -> List[Dict]:
     return [
@@ -18,9 +18,15 @@ def generate_templates() -> List[Dict]:
 
         # 조건문
         {"template": "x = __NUM__\ny = __NUM__\nresult = x if x > y else y", "imports": [], "category": "control", "weight": 1},
+        {"template": "x = __NUM__\nif x > 0:\n    result = x * 2\nelse:\n    result = -x", "imports": [], "category": "branching", "weight": 2},
+        {"template": "s = __STR__\nif isinstance(s, str):\n    result = len(s)\nelse:\n    result = -1", "imports": [], "category": "type-check", "weight": 2},
+        {"template": "try:\n    x = int(__STR__)\n    result = x * 2\nexcept ValueError:\n    result = -1\nelse:\n    result += 1", "imports": [], "category": "exception-branch", "weight": 2},
+        {"template": "x = __INT__\nmatch x:\n    case 1:\n        result = 'one'\n    case 2:\n        result = 'two'\n    case _:\n        result = 'other'", "imports": [], "category": "pattern-match", "weight": 1},
+        {"template": "x = __NUM__\nif x > 100:\n    if x % 2 == 0:\n        result = x // 2\n    else:\n        result = x * 3\nelse:\n    result = -x", "imports": [], "category": "nested-if", "weight": 2},
 
         # 반복문
         {"template": "acc = 0\nfor i in range(10):\n    acc += __NUM__\nresult = acc", "imports": [], "category": "loop", "weight": 1},
+        {"template": "[i * __NUM__ for i in range(10)]", "imports": [], "category": "loop", "weight": 1},
 
         # JSON
         {"template": "json.loads(__STR__)", "imports": ["json"], "category": "json", "weight": 1},
@@ -56,16 +62,40 @@ def generate_templates() -> List[Dict]:
         {"template": "sorted(set(__LIST__))", "imports": [], "category": "collection", "weight": 1},
         {"template": "len(set(__LIST__))", "imports": [], "category": "collection", "weight": 1},
 
-        # 리스트 내포
-        {"template": "[i * __NUM__ for i in range(10)]", "imports": [], "category": "loop", "weight": 1}
+        # 비교 연산 확장
+        {"template": "x = __NUM__\nresult = 1 < x < 100", "imports": [], "category": "compare-chain", "weight": 1},
+
+        # 비트 연산
+        {"template": "result = __NUM__ & __NUM__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __NUM__ | __NUM__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __NUM__ ^ __NUM__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __NUM__ << __INT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __NUM__ >> __INT__", "imports": [], "category": "bitwise", "weight": 1},
+
+        # 내부 접근 / 슬라이싱
+        {"template": "lst = __LIST__\nresult = lst[0] if lst else None", "imports": [], "category": "list-index", "weight": 1},
+        {"template": "d = __DICT__\nresult = d.get('key', -1)", "imports": [], "category": "dict-access", "weight": 1},
+        {"template": "s = __STR__\nresult = s[1:-1]", "imports": [], "category": "slice", "weight": 1},
+        {"template": "nums = __NUMLIST__\nresult = nums[::-1]", "imports": [], "category": "slice", "weight": 1},
+
+        # 사용자 정의 함수 및 클래스
+        {"template": "def add(x, y):\n    return x + y\nresult = add(__NUM__, __NUM__)", "imports": [], "category": "user-func", "weight": 1},
+        {"template": "class Point:\n    def __init__(self, x):\n        self.x = x\n    def double(self):\n        return self.x * 2\nresult = Point(__NUM__).double()", "imports": [], "category": "user-class", "weight": 1},
+
+        # 메모리 버퍼 관련
+        {"template": "b = bytearray(__BYTES__)\nresult = memoryview(b)[0]", "imports": [], "category": "buffer", "weight": 1},
+
+        # 제너레이터와 반복자
+        {"template": "def gen():\n    for i in range(3):\n        yield i\ng = gen()\nresult = next(g)", "imports": [], "category": "generator", "weight": 1},
+
+        # 클로저 및 nonlocal
+        {"template": "def outer():\n    x = __NUM__\n    def inner():\n        return x + 1\n    return inner()\nresult = outer()", "imports": [], "category": "closure", "weight": 1},
+        {"template": "def make_counter():\n    count = 0\n    def inc():\n        nonlocal count\n        count += 1\n        return count\n    return inc()\nresult = make_counter()", "imports": [], "category": "nonlocal", "weight": 1},
+        {"template": "result = (lambda x: x + 5)(__NUM__)", "imports": [], "category": "lambda", "weight": 1}
     ]
 
 
 def generate_code_template() -> str:
-    """
-    템플릿과 관련된 import 목록을 기반으로 코드 생성
-    category 및 placeholder 구조 유지, try-catch 포함
-    """
     templates = generate_templates()
     weights = [entry["weight"] for entry in templates]
     entry = random.choices(templates, weights=weights, k=1)[0]
@@ -76,11 +106,14 @@ def generate_code_template() -> str:
     import_lines = "\n".join(f"import {imp}" for imp in sorted(set(imports)))
 
     if "\n" in code_body or "result =" in code_body:
-        body_code = code_body
+        body_code = code_body.strip()
         return_stmt = "\n        return result" if "result =" in code_body else ""
-        code_block = f"{body_code}{return_stmt}"
+        if not body_code:
+            body_code = "pass"
+        indented_code = "\n".join("        " + line for line in body_code.splitlines())
+        code_block = f"{indented_code}{return_stmt}"
     else:
-        code_block = f"{result_var} = {code_body}\n        return {result_var}"
+        code_block = f"        {result_var} = {code_body}\n        return {result_var}"
 
     full_template = f"""
 # === setup ===
@@ -88,12 +121,17 @@ def generate_code_template() -> str:
 
 def target():
     try:
-        {code_block}
+{code_block}
     except Exception as e:
         return f"error: {{type(e).__name__}}"
 
+tmp = target()
+prev = probe_state(tmp)
 for _ in range(100):
-    probe_state(target())
+    tmp = target()
+    curr = probe_state(tmp)
+    if curr != prev:
+        print("값 변화 발생:", prev, "→", curr)
+    prev = curr
 """
     return full_template.strip()
-

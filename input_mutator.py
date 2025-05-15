@@ -5,25 +5,36 @@ import json
 def generate_number() -> str:
     choice = random.random()
     if choice < 0.2:
-        return str(random.randint(-10, 10))  # 짧고 작은 수
-    elif choice < 0.5:
-        return str(random.randint(-1000, 1000))  # 적당한 수
+        return str(round(random.uniform(-1e-12, 1e-12), 16))  # 0에 가까운 소수
+    elif choice < 0.4:
+        return str(round(random.uniform(-1e18, 1e18), 6))  # 아주 큰 소수/작은 소수
+    elif choice < 0.6:
+        return str(random.randint(-10**9, 10**9))  # 매우 큰 정수
     elif choice < 0.8:
-        return str(random.randint(-10**6, 10**6))  # 큰 정수
+        return str(random.randint(-1000, 1000))  # 일반적인 정수
     else:
-        return str(round(random.uniform(-1e6, 1e6), random.randint(3, 10)))  # 긴 소수
+        return str(round(random.uniform(-1e3, 1e3), random.randint(2, 8)))  # 적당한 소수
 
 def generate_int() -> str:
-    return str(random.randint(1, 10))
+    choice = random.random()
+    if choice < 0.3:
+        return str(random.randint(1, 3))  # 아주 작은 정수
+    elif choice < 0.6:
+        return str(random.randint(4, 100))  # 일반 크기 정수
+    else:
+        return str(random.randint(101, 1000000))  # 아주 큰 정수
 
 def generate_string() -> str:
     length = random.randint(3, 64)
-    safe_chars = string.ascii_letters + string.digits + string.punctuation.replace('"', '').replace("'", '')
-    chars = random.choices(safe_chars, k=length)
-    return '"' + ''.join(chars) + '"'
+    unsafe = '"\'(){}\\'
+    safe_chars = string.ascii_letters + string.digits + ''.join(c for c in string.punctuation if c not in unsafe)
+    chars = ''.join(random.choices(safe_chars, k=length))
+    return '"' + chars + '"'
 
 def generate_old_from_str(s: str) -> str:
     content = s.strip('"')
+    for c in '"\'(){}\\':
+        content = content.replace(c, '')
     if not content:
         return '"a"'
     start = random.randint(0, len(content) - 1)
