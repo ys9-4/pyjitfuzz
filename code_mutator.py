@@ -45,6 +45,7 @@ def generate_templates() -> List[Dict]:
         # 수학/통계
         {"template": "statistics.mean(__NUMLIST__)", "imports": ["statistics"], "category": "statistics", "weight": 1},
         {"template": "decimal.Decimal(__STR__)", "imports": ["decimal"], "category": "numeric", "weight": 1},
+        {"template": "decimal.Decimal(str(__NUM__))", "imports": ["decimal"], "category": "numeric", "weight": 1},
         {"template": "fractions.Fraction(__STR__)", "imports": ["fractions"], "category": "numeric", "weight": 1},
         {"template": "datetime.datetime.strptime(__DATE__, '%Y-%m-%d')", "imports": ["datetime"], "category": "datetime", "weight": 1},
         {"template": "functools.reduce(lambda x, y: x + y, __NUMLIST__)", "imports": ["functools"], "category": "functional", "weight": 1},
@@ -127,9 +128,11 @@ def target():
 
 tmp = target()
 prev = probe_state(tmp)
+print(prev)
 for _ in range(100):
     tmp = target()
     curr = probe_state(tmp)
+    print(curr)
     if curr != prev:
         print("값 변화 발생:", prev, "→", curr)
     prev = curr
