@@ -35,14 +35,27 @@ def generate_int() -> str:
     elif choice == 2:
         return str(random.randint(-100000, 0))
     elif choice == 3:
-        return str(random.randint(100001, 10**18))
+        return str(random.randint(100001, 10**6))
     elif choice == 4:
-        return str(random.randint(-10**18, -100001))
+        return str(random.randint(-10**6, -100001))
     else:
-        return str(random.randint(-2**63, 2**63 - 1))
+        return str(random.randint(-2**31, 2**31 - 1))
+
+def generate_uint() -> str:
+    return str(random.randint(0, 10000))
+
+def generate_uint_small() -> str:
+    return str(random.randint(2, 100))
+
+def generate_combo_index(seq: str) -> str:
+    try:
+        items = json.loads(seq)
+        return str(random.randint(0, len(items)))
+    except:
+        return "1"
 
 def generate_string() -> str:
-    length = random.randint(1, 32)
+    length = random.randint(3, 32)
     chars = ''.join(random.choices(string.ascii_letters + string.digits + string.punctuation, k=length))
     cleaned = clean_string(chars)
     return '"' + (cleaned if cleaned else "a") + '"'
@@ -56,32 +69,32 @@ def generate_old_from_str(s: str) -> str:
     return '"' + content[start:end] + '"'
 
 def generate_list() -> str:
-    size = random.randint(0, 10)
+    size = random.randint(3, 10)
     elements = [generate_number() if random.random() < 0.5 else generate_string() for _ in range(size)]
     return "[" + ", ".join(elements) + "]"
 
 def generate_tuple() -> str:
-    size = random.randint(1, 8)
+    size = random.randint(2, 10)
     elements = [generate_number() for _ in range(size)]
     return "(" + ", ".join(elements) + ")"
 
 def generate_dict() -> str:
-    size = random.randint(0, 5)
+    size = random.randint(2, 10)
     d = {generate_string(): generate_number() for _ in range(size)}
     return json.dumps(d)
 
 def generate_strlist() -> str:
-    size = random.randint(0, 10)
+    size = random.randint(3, 10)
     items = [generate_string() for _ in range(size)]
     return "[" + ", ".join(items) + "]"
 
 def generate_numlist() -> str:
-    size = random.randint(0, 10)
+    size = random.randint(3, 10)
     items = [generate_number() for _ in range(size)]
     return "[" + ", ".join(items) + "]"
 
 def generate_bytes() -> str:
-    size = random.randint(0, 32)
+    size = random.randint(8, 24)
     b = bytes(random.randint(0, 255) for _ in range(size))
     return repr(b)
 
@@ -95,6 +108,8 @@ def mutate_placeholders(code: str) -> str:
     generators = {
         "__NUM__": generate_number,
         "__INT__": generate_int,
+        "__UINT__": generate_uint,
+        "__UINT_SMALL__": generate_uint_small,
         "__STR__": generate_string,
         "__LIST__": generate_list,
         "__TUPLE__": generate_tuple,
@@ -109,14 +124,25 @@ def mutate_placeholders(code: str) -> str:
     str_cache = generate_string() if "__STR__" in code or "__OLD__" in code else None
 
     if str_cache:
-        code = re.sub(r"__STR__", lambda _: generate_string(), code)
+        code = re.sub(r"__STR__", lambda _: str_cache, code)
     if "__OLD__" in code:
-        code = re.sub(r"__OLD__", lambda _: generate_old_from_str(str_cache or generate_string()), code)
+        code = re.sub(r"__OLD__", lambda _: generate_old_from_str(str_cache), code)
     if "__NEW__" in code:
         code = re.sub(r"__NEW__", lambda _: generate_string(), code)
 
+    if "__STRLIST__" in code:
+        strlist = generate_strlist()
+        code = re.sub(r"__STRLIST__", strlist, code)
+        if "__UINT__" in code:
+            code = re.sub(r"__UINT__", generate_combo_index(strlist), code)
+    elif "__NUMLIST__" in code:
+        numlist = generate_numlist()
+        code = re.sub(r"__NUMLIST__", numlist, code)
+        if "__UINT__" in code:
+            code = re.sub(r"__UINT__", generate_combo_index(numlist), code)
+
     for key, func in generators.items():
-        if key in ("__STR__", "__OLD__", "__NEW__"):
+        if key in ("__STR__", "__OLD__", "__NEW__", "__STRLIST__", "__NUMLIST__"):
             continue
         if key in code:
             code = re.sub(re.escape(key), lambda _: func(), code)

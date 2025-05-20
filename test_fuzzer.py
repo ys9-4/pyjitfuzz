@@ -2,12 +2,20 @@ import os
 import sys
 import subprocess
 import atheris
+import signal
+import atexit
 
 from code_mutator import generate_code_template
 from input_mutator import mutate_placeholders
 from operation_mutator import mutate_operations
 
 execution_counter = 0 
+
+def handle_signal(signum, frame):
+    sys.exit(0)
+
+def on_exit():
+    print(f"\n총 실행된 테스트 횟수: {execution_counter}\n")
 
 def run_python(code: str, jit_enabled: bool) -> str:
     env = os.environ.copy()
@@ -58,28 +66,26 @@ def TestOneInput(data: bytes):
         output_jit = run_python(code, jit_enabled=True)
         output_interp = run_python(code, jit_enabled=False)
 
-        if "Error" in output_jit or "Warning" in output_jit:
-            print("\n에러 발생")
-            print(code)
-            print(output_jit)
+        # if "Error" in output_jit or "Warning" in output_jit:
+        #     # print("\n에러 발생")
+        #     # print(code)
+        #     # print(output_jit)
 
         if "값 변화 발생:" in output_jit or output_jit != output_interp:
-            print("\n차이 발생! 입력 코드:")
-            print(code)
-            print("--- JIT ---")
-            print(output_jit)
-            print("--- INTERP ---")
-            print(output_interp)
+            # print("\n차이 발생! 입력 코드:")
+            # print(code)
+            # print("--- JIT ---")
+            # print(output_jit)
+            # print("--- INTERP ---")
+            # print(output_interp)
             save_case(code, output_jit, output_interp)
 
     except Exception as e:
         pass
 
-def on_exit():
-    print(f"\n\n총 실행된 테스트 수: {execution_counter}")
-
-import atexit
 atexit.register(on_exit)
+signal.signal(signal.SIGTERM, handle_signal)
+signal.signal(signal.SIGINT, handle_signal)
 
 atheris.Setup(sys.argv, TestOneInput, enable_python_coverage=True)
 atheris.Fuzz()

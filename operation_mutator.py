@@ -11,9 +11,6 @@ UNOPS = ["-", "+", "~", "not"]
 COMPS = ["==", "!=", "<", ">", "<=", ">="]
 
 def mutate_operations(code: str) -> str:
-    """
-    템플릿 코드 내 __FUNC__, __BINOP__, __UNOP__, __COMP__ 등을 적절한 연산으로 대체
-    """
     # 함수 처리
     if "math.__FUNC__" in code:
         code = code.replace("__FUNC__", random.choice(MATH_FUNCS))

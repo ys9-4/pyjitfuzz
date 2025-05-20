@@ -12,9 +12,9 @@ def generate_templates() -> List[Dict]:
         {"template": "__STR__.replace(__OLD__, __NEW__)", "imports": [], "category": "string", "weight": 1},
 
         # 연산자
-        {"template": "__NUM__ __BINOP__ __NUM__", "imports": [], "category": "binary-op", "weight": 1},
-        {"template": "__UNOP__ __NUM__", "imports": [], "category": "unary-op", "weight": 1},
-        {"template": "__NUM__ __COMP__ __NUM__", "imports": [], "category": "compare", "weight": 1},
+        {"template": "(__NUM__) __BINOP__ (__NUM__)", "imports": [], "category": "binary-op", "weight": 1},
+        {"template": "__UNOP__ (__NUM__)", "imports": [], "category": "unary-op", "weight": 1},
+        {"template": "(__NUM__) __COMP__ (__NUM__)", "imports": [], "category": "compare", "weight": 1},
 
         # 조건문
         {"template": "x = __NUM__\ny = __NUM__\nresult = x if x > y else y", "imports": [], "category": "control", "weight": 1},
@@ -22,11 +22,11 @@ def generate_templates() -> List[Dict]:
         {"template": "s = __STR__\nif isinstance(s, str):\n    result = len(s)\nelse:\n    result = -1", "imports": [], "category": "type-check", "weight": 2},
         {"template": "try:\n    x = int(__STR__)\n    result = x * 2\nexcept ValueError:\n    result = -1\nelse:\n    result += 1", "imports": [], "category": "exception-branch", "weight": 2},
         {"template": "x = __INT__\nmatch x:\n    case 1:\n        result = 'one'\n    case 2:\n        result = 'two'\n    case _:\n        result = 'other'", "imports": [], "category": "pattern-match", "weight": 1},
-        {"template": "x = __NUM__\nif x > 100:\n    if x % 2 == 0:\n        result = x // 2\n    else:\n        result = x * 3\nelse:\n    result = -x", "imports": [], "category": "nested-if", "weight": 2},
+        {"template": "x = __NUM__\nif x > __INT__:\n    if x % 2 == 0:\n        result = x // 2\n    else:\n        result = x * 3\nelse:\n    result = -x", "imports": [], "category": "nested-if", "weight": 2},
 
         # 반복문
-        {"template": "acc = 0\nfor i in range(10):\n    acc += __NUM__\nresult = acc", "imports": [], "category": "loop", "weight": 1},
-        {"template": "[i * __NUM__ for i in range(10)]", "imports": [], "category": "loop", "weight": 1},
+        {"template": "acc = 0\nfor i in range(__UINT_SMALL__):\n    acc += __NUM__\nresult = acc", "imports": [], "category": "loop", "weight": 1},
+        {"template": "[i * __NUM__ for i in range(__UINT_SMALL__)]", "imports": [], "category": "loop", "weight": 1},
 
         # JSON
         {"template": "json.loads(__STR__)", "imports": ["json"], "category": "json", "weight": 1},
@@ -37,21 +37,23 @@ def generate_templates() -> List[Dict]:
         {"template": "struct.unpack('<I', __BYTES__)[0]", "imports": ["struct"], "category": "binary", "weight": 1},
 
         # ctypes
-        {"template": "ctypes.c_int(__NUM__).value", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
+        {"template": "ctypes.c_int(__INT__).value", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
         {"template": "ctypes.c_double(__NUM__).value", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
-        {"template": "ctypes.pointer(ctypes.c_int(__NUM__))", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
-        {"template": "(ctypes.c_int * 3)(*__NUMLIST__)[1]", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
+        {"template": "ctypes.pointer(ctypes.c_int(__UINT__))", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
+        {"template": "nums = __NUMLIST__\nArrayType = ctypes.c_double * len(eval(nums))\narr = ArrayType(*eval(nums))\nresult = arr[1]", "imports": ["ctypes"], "category": "ctypes", "weight": 1},
 
         # 수학/통계
         {"template": "statistics.mean(__NUMLIST__)", "imports": ["statistics"], "category": "statistics", "weight": 1},
         {"template": "decimal.Decimal(__STR__)", "imports": ["decimal"], "category": "numeric", "weight": 1},
         {"template": "decimal.Decimal(str(__NUM__))", "imports": ["decimal"], "category": "numeric", "weight": 1},
         {"template": "fractions.Fraction(__STR__)", "imports": ["fractions"], "category": "numeric", "weight": 1},
+        {"template": "fractions.Fraction(str(__NUM__))", "imports": ["fractions"], "category": "numeric", "weight": 1},
         {"template": "datetime.datetime.strptime(__DATE__, '%Y-%m-%d')", "imports": ["datetime"], "category": "datetime", "weight": 1},
         {"template": "functools.reduce(lambda x, y: x + y, __NUMLIST__)", "imports": ["functools"], "category": "functional", "weight": 1},
 
         # 조합 관련
-        {"template": "list(itertools.combinations(__STRLIST__, __INT__))", "imports": ["itertools"], "category": "combinatorics", "weight": 1},
+        {"template": "result = list(itertools.combinations(__STRLIST__, __UINT__))", "imports": ["itertools"], "category": "combinatorics", "weight": 1},
+        {"template": "result = list(itertools.combinations(__NUMLIST__, __UINT__))", "imports": ["itertools"], "category": "combinatorics", "weight": 1},
 
         # 시스템
         {"template": "platform.machine()", "imports": ["platform"], "category": "system", "weight": 1},
@@ -59,7 +61,7 @@ def generate_templates() -> List[Dict]:
 
         # 컬렉션
         {"template": "list(set(__LIST__))", "imports": [], "category": "collection", "weight": 1},
-        {"template": "dict(__LIST__)", "imports": [], "category": "collection", "weight": 1},
+        {"template": "dict([(__STR__, __NUM__), (__STR__, __NUM__)])", "imports": [], "category": "collection", "weight": 1},
         {"template": "sorted(set(__LIST__))", "imports": [], "category": "collection", "weight": 1},
         {"template": "len(set(__LIST__))", "imports": [], "category": "collection", "weight": 1},
 
@@ -67,15 +69,15 @@ def generate_templates() -> List[Dict]:
         {"template": "x = __NUM__\nresult = 1 < x < 100", "imports": [], "category": "compare-chain", "weight": 1},
 
         # 비트 연산
-        {"template": "result = __NUM__ & __NUM__", "imports": [], "category": "bitwise", "weight": 1},
-        {"template": "result = __NUM__ | __NUM__", "imports": [], "category": "bitwise", "weight": 1},
-        {"template": "result = __NUM__ ^ __NUM__", "imports": [], "category": "bitwise", "weight": 1},
-        {"template": "result = __NUM__ << __INT__", "imports": [], "category": "bitwise", "weight": 1},
-        {"template": "result = __NUM__ >> __INT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __UINT__ & __UINT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __UINT__ | __UINT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __UINT__ ^ __UINT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __UINT__ << __UINT__", "imports": [], "category": "bitwise", "weight": 1},
+        {"template": "result = __UINT__ >> __UINT__", "imports": [], "category": "bitwise", "weight": 1},
 
         # 내부 접근 / 슬라이싱
         {"template": "lst = __LIST__\nresult = lst[0] if lst else None", "imports": [], "category": "list-index", "weight": 1},
-        {"template": "d = __DICT__\nresult = d.get('key', -1)", "imports": [], "category": "dict-access", "weight": 1},
+        {"template": "d = {'key': __NUM__}\nresult = d.get('key', -1)", "imports": [], "category": "dict-access", "weight": 1},
         {"template": "s = __STR__\nresult = s[1:-1]", "imports": [], "category": "slice", "weight": 1},
         {"template": "nums = __NUMLIST__\nresult = nums[::-1]", "imports": [], "category": "slice", "weight": 1},
 
@@ -124,7 +126,7 @@ def target():
     try:
 {code_block}
     except Exception as e:
-        return f"error: {{type(e).__name__}}"
+        return ""
 
 tmp = target()
 prev = probe_state(tmp)
