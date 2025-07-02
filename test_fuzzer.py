@@ -1,9 +1,13 @@
 import os
 import sys
+import time
 import subprocess
 import atheris
 import signal
 import atexit
+import pyfiglet
+import shutil
+
 
 from code_mutator import generate_code_template
 from input_mutator import mutate_placeholders
@@ -12,7 +16,8 @@ from operation_mutator import mutate_operations
 execution_counter = 0 
 
 def handle_signal(signum, frame):
-    sys.exit(0)
+    print(f"\n총 실행된 테스트 횟수: {execution_counter}\n")
+    os._exit(0)
 
 def on_exit():
     print(f"\n총 실행된 테스트 횟수: {execution_counter}\n")
@@ -83,9 +88,75 @@ def TestOneInput(data: bytes):
     except Exception as e:
         pass
 
-atexit.register(on_exit)
-signal.signal(signal.SIGTERM, handle_signal)
-signal.signal(signal.SIGINT, handle_signal)
+def slow_print(text, delay=0.05, center=True):
+    """색상 코드 제외한 중앙 정렬 slow print"""
+    import re
+    term_width = shutil.get_terminal_size((80, 20)).columns
 
-atheris.Setup(sys.argv, TestOneInput, enable_python_coverage=True)
-atheris.Fuzz()
+    # ANSI escape code 제거용 정규식
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    plain_text = ansi_escape.sub('', text)
+
+    if center:
+        padding = (term_width - len(plain_text)) // 2
+        sys.stdout.write(" " * padding)
+
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    print()
+
+def framed_banner_centered(text: str, font="slant", padding=1):
+    """중앙 정렬된 아스키 아트 배너 + 박스 테두리"""
+    rendered = pyfiglet.figlet_format(text, font=font)
+    lines = rendered.splitlines()
+    content_width = max(len(line) for line in lines) + padding * 2
+    term_width = shutil.get_terminal_size((80, 20)).columns
+    box_margin = max((term_width - content_width) // 2, 0)
+    pad = " " * padding
+
+    top = "╔" + "═" * content_width + "╗"
+    bottom = "╚" + "═" * content_width + "╝"
+
+    print(" " * box_margin + top)
+    for line in lines:
+        content = "║" + pad + line.ljust(content_width - padding * 2) + pad + "║"
+        print(" " * box_margin + content)
+    print(" " * box_margin + bottom)
+
+def print_banner():
+    GREEN = "\033[92m"
+    CYAN = "\033[96m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+
+    print(GREEN, end="")
+    framed_banner_centered("pyjitfuzz", font="slant", padding=4)
+    print(RESET, end="")
+
+    time.sleep(0.5)
+    slow_print(f"{CYAN}2024 PNU Project{RESET}")
+    time.sleep(0.3)
+    slow_print(f"{BOLD}Team HongBoSeok{RESET}")
+    time.sleep(0.3)
+    slow_print(f"{BOLD}ys9-4, seonHH, ehdrjs6831{RESET}")
+    time.sleep(1)
+
+    # 구분선 중앙 정렬
+    term_width = shutil.get_terminal_size((80, 20)).columns
+    print(("-" * 50).center(term_width))
+
+def main():
+    print_banner()
+    atexit.register(on_exit)
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+
+    atheris.Setup(sys.argv, TestOneInput, enable_python_coverage=True)
+
+
+    atheris.Fuzz()
+
+if __name__ == "__main__":
+    main()
